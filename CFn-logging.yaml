@@ -89,7 +89,7 @@ Resources:
     Properties:
       DeliverLogsPermissionArn: !GetAtt VPCFlowLogsIAMRole.Arn
       LogDestinationType: cloud-watch-logs
-      ResourceId: !Ref 'AWS::NoValue'
+      ResourceId: vpc-01877e0cdf63832e3
       ResourceType: VPC
       TrafficType: ALL
       LogGroupName: !Sub /aws/vpc/flowlogs/${AWS::AccountId}
