@@ -56,7 +56,7 @@ Resources:
         - DataResources:
             - Type: AWS::S3::Object
               Values:
-                - arn:aws:s3:::
+                - arn:aws:s3:::*
           IncludeManagementEvents: true
           ReadWriteType: All
 
