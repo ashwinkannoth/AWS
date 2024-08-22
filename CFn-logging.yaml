@@ -15,20 +15,20 @@ Parameters:
 
 Resources:
   S3BucketForLogs:
-    Type: AWS::S3::Bucket
+    Type: 'AWS::S3::Bucket'
     Properties:
-      BucketName: !Sub log-storage-${AWS::AccountId}
+      BucketName: !Sub 'log-storage-${AWS::AccountId}'
       VersioningConfiguration:
         Status: Enabled
       LifecycleConfiguration:
         Rules:
-          - Id: ExpireLogsAfter365Days
+          - Id: "ExpireLogsAfter365Days"
             Status: Enabled
             ExpirationInDays: 365
-            Prefix: logs/
+            Prefix: "logs/"
 
   S3BucketPolicyForLogs:
-    Type: AWS::S3::BucketPolicy
+    Type: 'AWS::S3::BucketPolicy'
     Properties:
       Bucket: !Ref S3BucketForLogs
       PolicyDocument:
@@ -36,37 +36,37 @@ Resources:
           - Effect: Allow
             Principal:
               Service: cloudtrail.amazonaws.com
-            Action: s3:PutObject
-            Resource: !Sub arn:aws:s3:::log-storage-${AWS::AccountId}/cloudtrail-logs/AWSLogs/${AWS::AccountId}/*
+            Action: 's3:PutObject'
+            Resource: !Sub 'arn:aws:s3:::log-storage-${AWS::AccountId}/cloudtrail-logs/AWSLogs/${AWS::AccountId}/*'
             Condition:
               StringEquals:
                 s3:x-amz-acl: bucket-owner-full-control
           - Effect: Allow
             Principal:
               Service: vpc-flow-logs.amazonaws.com
-            Action: s3:PutObject
-            Resource: !Sub arn:aws:s3:::log-storage-${AWS::AccountId}/vpc-flow-logs/${VPCId}/*
+            Action: 's3:PutObject'
+            Resource: !Sub 'arn:aws:s3:::log-storage-${AWS::AccountId}/vpc-flow-logs/${VPCId}/*'
             Condition:
               StringEquals:
                 aws:SourceAccount: !Ref AccountId
           - Effect: Allow
             Principal:
               Service: vpc-flow-logs.amazonaws.com
-            Action: s3:GetBucketAcl
-            Resource: !Sub arn:aws:s3:::log-storage-${AWS::AccountId}
+            Action: 's3:GetBucketAcl'
+            Resource: !Sub 'arn:aws:s3:::log-storage-${AWS::AccountId}'
 
   CloudTrailLogGroup:
-    Type: AWS::Logs::LogGroup
+    Type: 'AWS::Logs::LogGroup'
     Properties:
-      LogGroupName: !Sub /app/cloudtrail/logs
+      LogGroupName: !Sub '/app/cloudtrail/logs'
       RetentionInDays: 365
 
   CloudTrailTrail:
-    Type: AWS::CloudTrail::Trail
+    Type: 'AWS::CloudTrail::Trail'
     Properties:
-      TrailName: CloudTrail-For-Logs
+      TrailName: 'CloudTrail-For-Logs'
       S3BucketName: !Ref S3BucketForLogs
-      S3KeyPrefix: cloudtrail-logs
+      S3KeyPrefix: 'cloudtrail-logs'
       IsLogging: true
       IncludeGlobalServiceEvents: true
       IsMultiRegionTrail: true
@@ -74,7 +74,7 @@ Resources:
       CloudWatchLogsRoleArn: !GetAtt CloudTrailRole.Arn
 
   CloudTrailRole:
-    Type: AWS::IAM::Role
+    Type: 'AWS::IAM::Role'
     Properties:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
@@ -82,49 +82,27 @@ Resources:
           - Effect: Allow
             Principal:
               Service: cloudtrail.amazonaws.com
-            Action: sts:AssumeRole
+            Action: 'sts:AssumeRole'
       Policies:
-        - PolicyName: CloudTrailToCloudWatchLogsPolicy
+        - PolicyName: 'CloudTrailToCloudWatchLogsPolicy'
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
                 Action:
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource: !Sub arn:aws:logs:*:${AWS::AccountId}:log-group:/app/cloudtrail/logs:*
-
-  VPCFlowLogsRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: vpc-flow-logs.amazonaws.com
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: VPCFlowLogsToS3Policy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action: s3:PutObject
-                Resource: !Sub arn:aws:s3:::log-storage-${AWS::AccountId}/vpc-flow-logs/${VPCId}/*
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: !Sub 'arn:aws:logs:*:${AWS::AccountId}:log-group:/app/cloudtrail/logs:*'
 
   VPCFlowLogs:
-    Type: AWS::EC2::FlowLog
+    Type: 'AWS::EC2::FlowLog'
     Properties:
-      DeliverLogsPermissionArn: !GetAtt VPCFlowLogsRole.Arn
       LogDestinationType: s3
+      LogDestination: !Sub 'arn:aws:s3:::log-storage-${AWS::AccountId}/vpc-flow-logs/${VPCId}'
       ResourceId: !Ref VPCId
       ResourceType: VPC
       TrafficType: ALL
-      LogDestination: !Sub arn:aws:s3:::log-storage-${AWS::AccountId}/vpc-flow-logs/${VPCId}
-      LogFormat: ${version} ${account-id} ${interface-id} ${srcaddr} ${dstaddr}
-        ${srcport} ${dstport} ${protocol} ${packets} ${bytes} ${start} ${end}
-        ${action} ${log-status}
+      LogFormat: '${version} ${account-id} ${interface-id} ${srcaddr} ${dstaddr} ${srcport} ${dstport} ${protocol} ${packets} ${bytes} ${start} ${end} ${action} ${log-status}'
 
 Outputs:
   S3BucketName:
@@ -142,3 +120,13 @@ Outputs:
   CloudTrailTrailArn:
     Description: The ARN of the CloudTrail Trail.
     Value: !GetAtt CloudTrailTrail.Arn
+
+Key Points:
+
+    Removed DeliverLogsPermissionArn: This property is not needed when the logs are sent to an S3 bucket (LogDestinationType: s3).
+    Permissions: The S3 bucket policy grants the necessary permissions for vpc-flow-logs.amazonaws.com to write logs to the specified S3 bucket.
+
+This template should now work without errors, correctly setting up your VPC Flow Logs to send data to your S3 bucket.
+2/2
+Was this response better or worse?
+New version of GPT available - Continue chatting to use the old version, or start a new chat for the latest version.
