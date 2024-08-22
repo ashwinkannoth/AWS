@@ -1,79 +1,43 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: >
-  CloudFormation template to create an S3 bucket for storing logs from CloudTrail and VPC Flow Logs.
-
 Resources:
-  LogBucket:
+  LogS3Bucket:
     Type: AWS::S3::Bucket
-    Properties: 
-      BucketName: !Sub "${AWS::StackName}-log-bucket"
+    Properties:
+      BucketName: !Sub '${AWS::AccountId}-logs-bucket'
       VersioningConfiguration:
         Status: Enabled
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
-      PublicAccessBlockConfiguration:
-        BlockPublicAcls: true
-        BlockPublicPolicy: true
-        IgnorePublicAcls: true
-        RestrictPublicBuckets: true
 
   LogBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: !Ref LogBucket
+      Bucket: !Ref LogS3Bucket
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
-          - Sid: AllowCloudTrailAccess
+          - Sid: AllowCloudTrailLogs
             Effect: Allow
             Principal:
               Service: cloudtrail.amazonaws.com
-            Action: s3:PutObject
-            Resource: !Sub "${LogBucket.Arn}/cloudtrail/AWSLogs/${AWS::AccountId}/*"
+            Action: 's3:PutObject'
+            Resource: !Sub '${LogS3Bucket.Arn}/cloudtrail/AWSLogs/${AWS::AccountId}/*'
             Condition:
               StringEquals:
                 s3:x-amz-acl: bucket-owner-full-control
-          - Sid: AllowVPCAccess
+          - Sid: AllowVPCCaptureLogs
             Effect: Allow
             Principal:
-              Service: vpc-flow-logs.amazonaws.com
-            Action: s3:PutObject
-            Resource: !Sub "${LogBucket.Arn}/vpcflowlogs/${AWS::AccountId}/vpc-01877e0cdf63832e3/*"
+              Service: delivery.logs.amazonaws.com
+            Action: 's3:PutObject'
+            Resource: !Sub '${LogS3Bucket.Arn}/vpc-flow-logs/AWSLogs/${AWS::AccountId}/*'
             Condition:
               StringEquals:
                 s3:x-amz-acl: bucket-owner-full-control
 
-  CloudTrail:
-    Type: AWS::CloudTrail::Trail
-    Properties:
-      TrailName: !Sub "${AWS::StackName}-cloudtrail"
-      S3BucketName: !Ref LogBucket
-      S3KeyPrefix: "cloudtrail"
-      IsLogging: true
-      IncludeGlobalServiceEvents: true
-      IsMultiRegionTrail: true
-      EnableLogFileValidation: true
-      EventSelectors:
-        - ReadWriteType: All
-          IncludeManagementEvents: true
-          DataResources:
-            - Type: AWS::S3::Object
-              Values:
-                - !Sub "arn:aws:s3:::${LogBucket}/*"
-
-  VPCFlowLogs:
-    Type: AWS::EC2::FlowLog
-    Properties:
-      DeliverLogsPermissionArn: !GetAtt VPCFlowLogRole.Arn
-      LogDestinationType: s3
-      LogDestination: !Sub "arn:aws:s3:::${LogBucket}/vpcflowlogs"
-      ResourceId: vpc-01877e0cdf63832e3
-      ResourceType: VPC
-      TrafficType: ALL
-
-  VPCFlowLogRole:
+  CloudTrailRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -81,29 +45,89 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service: vpc-flow-logs.amazonaws.com
-            Action: sts:AssumeRole
+              Service: cloudtrail.amazonaws.com
+            Action: 'sts:AssumeRole'
       Policies:
-        - PolicyName: VPCFlowLogPolicy
+        - PolicyName: CloudTrailPolicy
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
-                Action: s3:PutObject
-                Resource: !Sub "${LogBucket.Arn}/vpcflowlogs/*"
+                Action:
+                  - 's3:PutObject'
+                Resource: !Sub '${LogS3Bucket.Arn}/cloudtrail/AWSLogs/${AWS::AccountId}/*'
                 Condition:
                   StringEquals:
                     s3:x-amz-acl: bucket-owner-full-control
 
+  VPCFlowLogsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: delivery.logs.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: VPCFlowLogsPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:PutObject'
+                Resource: !Sub '${LogS3Bucket.Arn}/vpc-flow-logs/AWSLogs/${AWS::AccountId}/*'
+                Condition:
+                  StringEquals:
+                    s3:x-amz-acl: bucket-owner-full-control
+
+  CloudTrailTrail:
+    Type: AWS::CloudTrail::Trail
+    Properties:
+      TrailName: MyCloudTrail
+      S3BucketName: !Ref LogS3Bucket
+      S3KeyPrefix: cloudtrail
+      IsLogging: true
+      IncludeGlobalServiceEvents: true
+      ManagementEvents: 'All'
+      EventSelectors:
+        - ReadWriteType: All
+          IncludeManagementEvents: true
+          DataResources:
+            - Type: AWS::S3::Object
+              Values:
+                - !Sub 'arn:aws:s3:::${AWS::AccountId}/*'
+
+  VPCFlowLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/vpc-flow-logs/${VPCID}'
+      RetentionInDays: 365
+
+  VPCFlowLogsSubscription:
+    Type: AWS::EC2::FlowLog
+    Properties:
+      DeliverLogsPermissionArn: !GetAtt VPCFlowLogsRole.Arn
+      LogGroupName: !Ref VPCFlowLogs
+      ResourceId: 'vpc-01877e0cdf63832e3'
+      ResourceType: VPC
+      TrafficType: ALL
+      LogDestinationType: s3
+      LogDestination: !GetAtt LogS3Bucket.Arn
+      LogFormat: '${version} ${account-id} ${interface-id} ${srcaddr} ${dstaddr} ${srcport} ${dstport} ${protocol} ${packets} ${bytes} ${start} ${end} ${action} ${log-status}'
+      MaxAggregationInterval: 60
+
 Outputs:
-  LogBucketName:
-    Description: "Name of the S3 bucket storing logs"
-    Value: !Ref LogBucket
+  S3BucketName:
+    Description: "The name of the S3 bucket where logs are stored"
+    Value: !Ref LogS3Bucket
 
   CloudTrailName:
-    Description: "Name of the CloudTrail"
-    Value: !Ref CloudTrail
+    Description: "The name of the CloudTrail trail"
+    Value: !Ref CloudTrailTrail
 
-  VPCFlowLogRoleArn:
-    Description: "ARN of the IAM Role used by VPC Flow Logs"
-    Value: !GetAtt VPCFlowLogRole.Arn
+  VPCFlowLogsGroup:
+    Description: "The name of the Log Group where VPC Flow Logs are stored"
+    Value: !Ref VPCFlowLogs
