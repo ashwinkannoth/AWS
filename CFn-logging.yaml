@@ -7,12 +7,12 @@ Parameters:
   AccountId:
     Type: String
     Description: The AWS Account ID
-    Default: !Sub ${AWS::AccountId} # Automatically resolves to the current account ID
+    Default: "!Sub ${AWS::AccountId}" # Automatically resolves to the current account ID
 
   VPCId:
     Type: String
     Description: The ID of the VPC for which VPC Flow Logs will be enabled.
-    Default: vpc-01877e0cdf63832e3 # This can remain as it's a string
+    Default: "vpc-01877e0cdf63832e3" # This can remain as it's a string
 
 Resources:
   S3BucketForLogs:
