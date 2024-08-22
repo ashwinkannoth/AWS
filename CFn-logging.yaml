@@ -60,36 +60,10 @@ Resources:
           IncludeManagementEvents: true
           ReadWriteType: All
 
-  # IAM Role for VPC Flow Logs
-  VPCFlowLogsIAMRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: vpc-flow-logs.amazonaws.com
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: VPCFlowLogsPolicy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - s3:PutObject
-                  - s3:GetBucketAcl
-                  - s3:GetBucketLocation
-                Resource: 
-                  - !Sub arn:aws:s3:::${LogS3Bucket}/VPCFlowLogs/*
-                  - !Sub arn:aws:s3:::${LogS3Bucket}
-
   # VPC Flow Logs for all VPCs
   VPCFlowLogs:
     Type: AWS::EC2::FlowLog
     Properties:
-      DeliverLogsPermissionArn: !GetAtt VPCFlowLogsIAMRole.Arn
       LogDestinationType: s3
       LogDestination: !Sub arn:aws:s3:::${LogS3Bucket}/VPCFlowLogs/
       ResourceId: vpc-01877e0cdf63832e3
