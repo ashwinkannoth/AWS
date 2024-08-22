@@ -1,6 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 # Description: CloudFormation Template to enable CloudTrail logging for management and S3 events and capture VPC Flow Logs.
 
+
 Resources:
 
   # S3 Bucket for CloudTrail and VPC Flow Logs
