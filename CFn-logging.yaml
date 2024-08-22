@@ -1,12 +1,12 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Enable CloudTrail logging for management and S3 events, and configure VPC Flow Logs.
+Description: Enable CloudTrail logging for management and S3 events, and configure VPC Flow Logs, both stored in the same S3 bucket under different folders.
 
 Resources:
-  # S3 Bucket for CloudTrail logs
-  CloudTrailS3Bucket:
+  # S3 Bucket for CloudTrail and VPC Flow Logs
+  LogS3Bucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub cloudtrail-logs-${AWS::AccountId}-${AWS::Region}
+      BucketName: !Sub cloudtrail-vpc-logs-${AWS::AccountId}-${AWS::Region}
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -14,13 +14,6 @@ Resources:
         RestrictPublicBuckets: true
       VersioningConfiguration:
         Status: Enabled
-
-  # CloudWatch Log Group for CloudTrail
-  CloudTrailLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub /aws/cloudtrail/${AWS::AccountId}
-      RetentionInDays: 365
 
   # IAM Role for CloudTrail
   CloudTrailIAMRole:
@@ -43,13 +36,9 @@ Resources:
                   - s3:PutObject
                   - s3:GetBucketAcl
                   - s3:GetBucketLocation
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
                 Resource: 
-                  - !Sub arn:aws:s3:::${CloudTrailS3Bucket}/*
-                  - !Sub arn:aws:s3:::${CloudTrailS3Bucket}
-                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/cloudtrail/${AWS::AccountId}:*
-                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/cloudtrail/${AWS::AccountId}:log-stream:*
+                  - !Sub arn:aws:s3:::${LogS3Bucket}/CloudTrailEvents/*
+                  - !Sub arn:aws:s3:::${LogS3Bucket}
 
   # CloudTrail
   CloudTrail:
@@ -57,13 +46,12 @@ Resources:
     DependsOn: CloudTrailIAMRole
     Properties:
       TrailName: !Sub cloudtrail-${AWS::AccountId}
-      S3BucketName: !Ref CloudTrailS3Bucket
+      S3BucketName: !Ref LogS3Bucket
+      S3KeyPrefix: CloudTrailEvents
       IsMultiRegionTrail: true
       IncludeGlobalServiceEvents: true
       EnableLogFileValidation: true
       IsLogging: true
-      CloudWatchLogsLogGroupArn: !GetAtt CloudTrailLogGroup.Arn
-      CloudWatchLogsRoleArn: !GetAtt CloudTrailIAMRole.Arn
       EventSelectors:
         - DataResources:
             - Type: AWS::S3::Object
@@ -90,28 +78,36 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource: "*"
+                  - s3:PutObject
+                  - s3:GetBucketAcl
+                  - s3:GetBucketLocation
+                Resource: 
+                  - !Sub arn:aws:s3:::${LogS3Bucket}/VPCFlowLogs/*
+                  - !Sub arn:aws:s3:::${LogS3Bucket}
 
   # VPC Flow Logs for all VPCs
   VPCFlowLogs:
     Type: AWS::EC2::FlowLog
     Properties:
       DeliverLogsPermissionArn: !GetAtt VPCFlowLogsIAMRole.Arn
-      LogDestinationType: cloud-watch-logs
+      LogDestinationType: s3
+      LogDestination: !Sub arn:aws:s3:::${LogS3Bucket}/VPCFlowLogs/
       ResourceId: vpc-01877e0cdf63832e3
       ResourceType: VPC
       TrafficType: ALL
-      LogGroupName: !Sub /aws/vpc/flowlogs/${AWS::AccountId}
       MaxAggregationInterval: 60
       LogFormat: '${srcaddr} ${dstaddr} ${srcport} ${dstport} ${protocol} ${packets} ${bytes} ${action} ${log-status}'
 
 Outputs:
+  S3BucketName:
+    Description: "The name of the S3 bucket where logs are stored"
+    Value: !Ref LogS3Bucket
   CloudTrailArn:
     Description: "CloudTrail ARN"
     Value: !Ref CloudTrail
-  VPCFlowLogsGroupName:
-    Description: "VPC Flow Logs Group Name"
-    Value: !Sub /aws/vpc/flowlogs/${AWS::AccountId}
+  VPCFlowLogsLocation:
+    Description: "VPC Flow Logs stored in S3 at this location"
+    Value: !Sub arn:aws:s3:::${LogS3Bucket}/VPCFlowLogs/
+  CloudTrailEventsLocation:
+    Description: "CloudTrail Events stored in S3 at this location"
+    Value: !Sub arn:aws:s3:::${LogS3Bucket}/CloudTrailEvents/
