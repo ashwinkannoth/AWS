@@ -15,6 +15,13 @@ Resources:
       VersioningConfiguration:
         Status: Enabled
 
+  # CloudWatch Log Group for CloudTrail
+  CloudTrailLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/cloudtrail/${AWS::AccountId}
+      RetentionInDays: 365
+
   # IAM Role for CloudTrail
   CloudTrailIAMRole:
     Type: AWS::IAM::Role
@@ -36,9 +43,13 @@ Resources:
                   - s3:PutObject
                   - s3:GetBucketAcl
                   - s3:GetBucketLocation
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
                 Resource: 
                   - !Sub arn:aws:s3:::${CloudTrailS3Bucket}/*
                   - !Sub arn:aws:s3:::${CloudTrailS3Bucket}
+                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/cloudtrail/${AWS::AccountId}:*
+                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/cloudtrail/${AWS::AccountId}:log-stream:*
 
   # CloudTrail
   CloudTrail:
@@ -51,6 +62,7 @@ Resources:
       IncludeGlobalServiceEvents: true
       EnableLogFileValidation: true
       IsLogging: true
+      CloudWatchLogsLogGroupArn: !GetAtt CloudTrailLogGroup.Arn
       CloudWatchLogsRoleArn: !GetAtt CloudTrailIAMRole.Arn
       EventSelectors:
         - DataResources:
