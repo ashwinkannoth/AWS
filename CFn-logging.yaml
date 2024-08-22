@@ -119,6 +119,7 @@ Resources:
       DeliverLogsPermissionArn: !GetAtt VPCFlowLogsRole.Arn
       LogDestinationType: s3
       ResourceId: !Ref VPCId
+      ResourceType: VPC
       TrafficType: ALL
       LogDestination: !Sub arn:aws:s3:::log-storage-${AWS::AccountId}/vpc-flow-logs/${VPCId}
       LogFormat: ${version} ${account-id} ${interface-id} ${srcaddr} ${dstaddr}
