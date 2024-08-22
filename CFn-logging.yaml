@@ -120,13 +120,3 @@ Outputs:
   CloudTrailTrailArn:
     Description: The ARN of the CloudTrail Trail.
     Value: !GetAtt CloudTrailTrail.Arn
-
-Key Points:
-
-    Removed DeliverLogsPermissionArn: This property is not needed when the logs are sent to an S3 bucket (LogDestinationType: s3).
-    Permissions: The S3 bucket policy grants the necessary permissions for vpc-flow-logs.amazonaws.com to write logs to the specified S3 bucket.
-
-This template should now work without errors, correctly setting up your VPC Flow Logs to send data to your S3 bucket.
-2/2
-Was this response better or worse?
-New version of GPT available - Continue chatting to use the old version, or start a new chat for the latest version.
